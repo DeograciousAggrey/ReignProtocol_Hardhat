@@ -22,6 +22,16 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     ///////   Error Messages   ///////
     /////////////////////////////////
     error opportunityPool__InvalidAddress();
+    error opportunityPool__InvalidID();
+    error opportunityPool__InvalidAmount();
+    error opportunityPool__InvalidPoolStatus();
+    error opportunityPool__InvalidRole();
+    error opportunityPool__InvalidDrawdownStatus();
+    error opportunityPool__Repaid();
+    error opportunityPool__InvalidCaller();
+    error opportunityPool__InvalidOpportunityStatus();
+
+    //////////////////////////////////////////
 
     ReignConfig public reignConfig;
 
@@ -178,18 +188,13 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     ////////////////////////////////////
 
     modifier onlyBorrower() {
-        require(
-            hasRole(Constants.getBorrowerRole(), msg.sender));
+        require(hasRole(Constants.getBorrowerRole(), msg.sender));
 
-        
         _;
     }
 
     modifier onlyPoolLocker() {
-        require(
-            hasRole(Constants.getPoolLockerRole(), msg.sender),
-            "Caller is not pool locker"
-        );
+        require(hasRole(Constants.getPoolLockerRole(), msg.sender));
         _;
     }
 
@@ -197,47 +202,39 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         uint8 _subpoolId,
         uint256 amount
     ) external override nonReentrant {
-        require(
-            _subpoolId <= uint8(SubPool.SeniorSubpool),
-            "Invalid subpool id"
-        );
-        require(amount > 0, "Amount should be greater than zero");
+        if (_subpoolId > uint8(SubPool.SeniorSubpool))
+            revert opportunityPool__InvalidID();
+        if (amount <= 0) revert opportunityPool__InvalidAmount();
 
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
-            require(
-                s_seniorSubPoolDetails.isPoolLocked == false,
-                "Senior subpool is locked"
-            );
-            require(
-                hasRole(Constants.getSeniorPoolRole(), msg.sender),
-                "Caller is doesn't have role in senior pool"
-            );
+            if (s_seniorSubPoolDetails.isPoolLocked)
+                revert opportunityPool__InvalidPoolStatus();
+            if (hasRole(Constants.getSeniorPoolRole(), msg.sender))
+                revert opportunityPool__InvalidRole();
+
             uint256 totalAmountAfterDeposit = amount.add(
                 s_seniorSubPoolDetails.depositedAmount
             );
 
-            require(
+            if (
                 totalAmountAfterDeposit <=
-                    s_seniorSubPoolDetails.totalDepositable,
-                "Senior subpool deposit limit exceeded"
-            );
+                s_seniorSubPoolDetails.totalDepositable
+            ) revert opportunityPool__InvalidAmount();
             s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails
                 .depositedAmount
                 .add(amount);
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
-            require(
-                s_juniorSubPoolDetails.isPoolLocked == false,
-                "Junior subpool is locked"
-            );
+            if (s_juniorSubPoolDetails.isPoolLocked == false)
+                revert opportunityPool__InvalidPoolStatus();
+
             uint256 totalAmountAfterDeposit = amount.add(
                 s_juniorSubPoolDetails.depositedAmount
             );
 
-            require(
+            if (
                 totalAmountAfterDeposit <=
-                    s_juniorSubPoolDetails.totalDepositable,
-                "Junior subpool deposit limit exceeded"
-            );
+                s_juniorSubPoolDetails.totalDepositable
+            ) revert opportunityPool__InvalidAmount();
             s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails
                 .depositedAmount
                 .add(amount);
@@ -271,15 +268,12 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         whenNotPaused
         onlyBorrower
     {
-        require(
-            opportunityManager.isDrawndown(s_opportunityID) == false,
-            "Drawdown already done"
-        );
-        require(s_isDrawdownsPaused == false, "Drawdowns are paused");
-        require(
-            s_poolBalance == s_loanAmount,
-            "Pool balance is not equal to loan amount"
-        );
+        if (opportunityManager.isDrawndown(s_opportunityID) == false)
+            revert opportunityPool__InvalidDrawdownStatus();
+        if (s_isDrawdownsPaused == false)
+            revert opportunityPool__InvalidDrawdownStatus();
+        if (s_poolBalance == s_loanAmount)
+            revert opportunityPool__InvalidDrawdownStatus();
 
         uint256 amount = s_poolBalance;
         s_poolBalance = 0;
@@ -291,14 +285,10 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function repayment() public override nonReentrant onlyBorrower {
-        require(
-            s_repaymentCounter <= s_totalRepayments,
-            "All repayments are done"
-        );
-        require(
-            opportunityManager.isDrawndown(s_opportunityID),
-            "Drawdown is not done"
-        );
+        if (s_repaymentCounter <= s_totalRepayments)
+            revert opportunityPool__Repaid();
+        if (opportunityManager.isDrawndown(s_opportunityID))
+            revert opportunityPool__InvalidDrawdownStatus();
 
         uint256 currentRepaymentTime = block.timestamp;
         uint256 currentRepaymentDue = nextRepaymentTime();
@@ -506,30 +496,20 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     function withdrawAll(
         uint8 _subpoolId
     ) external override nonReentrant whenNotPaused returns (uint256) {
-        require(
-            _subpoolId <= uint8(SubPool.SeniorSubpool),
-            "Invalid subpool id"
-        );
-        require(
-            opportunityManager.isRepaid(s_opportunityID),
-            "Opportunity is not repaid"
-        );
+        if (_subpoolId <= uint8(SubPool.SeniorSubpool))
+            revert opportunityPool__InvalidID();
+        if (opportunityManager.isRepaid(s_opportunityID))
+            revert opportunityPool__Repaid();
 
         uint256 amount;
 
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
-            require(
-                s_seniorSubPoolDetails.isPoolLocked == false,
-                "Senior subpool is locked"
-            );
-            require(
-                hasRole(Constants.getSeniorPoolRole(), msg.sender),
-                "Caller is doesn't have role in senior pool"
-            );
-            require(
-                s_seniorSubPoolDetails.depositedAmount > 0,
-                "Senior subpool deposited amount is zero"
-            );
+            if (s_seniorSubPoolDetails.isPoolLocked == false)
+                revert opportunityPool__InvalidPoolStatus();
+            if (hasRole(Constants.getSeniorPoolRole(), msg.sender))
+                revert opportunityPool__InvalidRole();
+            if (s_seniorSubPoolDetails.depositedAmount > 0)
+                revert opportunityPool__InvalidAmount();
 
             amount = s_seniorSubPoolDetails.depositedAmount.add(
                 s_seniorSubPoolDetails.yieldGenerated
@@ -543,21 +523,16 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             s_seniorSubPoolDetails.depositedAmount = 0;
             s_seniorSubPoolDetails.yieldGenerated = 0;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
-            require(
-                s_juniorSubPoolDetails.isPoolLocked == false,
-                "Junior subpool is locked"
-            );
-            require(
-                isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0,
-                "Caller is not staking"
-            );
+            if (s_juniorSubPoolDetails.isPoolLocked == false)
+                revert opportunityPool__InvalidPoolStatus();
+            if (isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0)
+                revert opportunityPool__InvalidCaller();
             uint256 offset = reignConfig.getAdjustmentOffset();
 
-            require(
+            if (
                 s_stakingBalance[msg.sender] <=
-                    s_juniorSubPoolDetails.depositedAmount.add(offset),
-                "Staking balance is greater than deposited amount"
-            );
+                s_juniorSubPoolDetails.depositedAmount.add(offset)
+            ) revert opportunityPool__InvalidAmount();
 
             uint256 yieldEarned = s_juniorSubPoolDetails
                 .yieldGenerated
@@ -565,10 +540,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
                 .div(Constants.sixDecimals());
             yieldEarned = yieldEarned.sub(offset);
 
-            require(
-                yieldEarned <= s_juniorSubPoolDetails.yieldGenerated,
-                "Yield earned is greater than total yield generated"
-            );
+            if (yieldEarned <= s_juniorSubPoolDetails.yieldGenerated)
+                revert opportunityPool__InvalidAmount();
 
             uint256 userStakingBalance = s_stakingBalance[msg.sender].sub(
                 offset
@@ -609,10 +582,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         override
         returns (uint256)
     {
-        require(
-            isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0,
-            "Caller is not staking"
-        );
+        if (isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0)
+            revert opportunityPool__InvalidCaller();
         uint256 amount = 0;
 
         if (opportunityManager.isRepaid(s_opportunityID)) {
@@ -636,14 +607,10 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function getRepaymentAmount() external view override returns (uint256) {
-        require(
-            s_repaymentCounter <= s_totalRepayments,
-            "All repayments are done"
-        );
-        require(
-            opportunityManager.isDrawndown(s_opportunityID),
-            "Drawdown is not done"
-        );
+        if (s_repaymentCounter <= s_totalRepayments)
+            revert opportunityPool__Repaid();
+        if (opportunityManager.isDrawndown(s_opportunityID))
+            revert opportunityPool__InvalidDrawdownStatus();
 
         uint256 amount;
         if (s_loanType == 1) {
@@ -716,10 +683,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function nextRepaymentTime() public view override returns (uint256) {
-        require(
-            s_repaymentCounter <= s_totalRepayments,
-            "All repayments are done"
-        );
+        if (s_repaymentCounter <= s_totalRepayments)
+            revert opportunityPool__Repaid();
         uint256 nextRepaymentDue = s_repaymentStartTime.add(
             s_repaymentCounter.mul(s_paymentFrequencyInDays).mul(86400)
         );
@@ -742,10 +707,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function lockPool(uint8 _subpoolId) public onlyPoolLocker {
-        require(
-            _subpoolId <= uint8(SubPool.SeniorSubpool),
-            "Invalid subpool id"
-        );
+        if (_subpoolId <= uint8(SubPool.SeniorSubpool))
+            revert opportunityPool__InvalidID();
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
             s_seniorSubPoolDetails.isPoolLocked = true;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
@@ -754,10 +717,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function unlockPool(uint8 _subpoolId) public onlyPoolLocker {
-        require(
-            _subpoolId <= uint8(SubPool.SeniorSubpool),
-            "Invalid subpool id"
-        );
+        if (_subpoolId <= uint8(SubPool.SeniorSubpool))
+            revert opportunityPool__InvalidID();
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
             s_seniorSubPoolDetails.isPoolLocked = false;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
@@ -783,14 +744,10 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function writeOffOpportunity() external override {
-        require(
-            opportunityManager.isWrittenOff(s_opportunityID) == true,
-            "Opportunity is not write off"
-        );
-        require(
-            msg.sender == reignConfig.getOpportunityOrigination(),
-            "Caller is not opportunity Manager"
-        );
+        if (opportunityManager.isWrittenOff(s_opportunityID) == true)
+            revert opportunityPool__InvalidOpportunityStatus();
+        if (msg.sender == reignConfig.getOpportunityOrigination())
+            revert opportunityPool__InvalidCaller();
 
         uint256 temp = s_loanAmount.div(reignConfig.getLeverageRatio() + 1);
         uint256 tempSenior = temp.mul(reignConfig.getLeverageRatio());
@@ -871,10 +828,8 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         override
         returns (uint256 amount)
     {
-        require(
-            s_seniorSubPoolDetails.isPoolLocked == false,
-            "Senior subpool is locked"
-        );
+        if (s_seniorSubPoolDetails.isPoolLocked == false)
+            revert opportunityPool__InvalidPoolStatus();
 
         amount = s_seniorSubPoolDetails.depositedAmount.add(
             s_seniorSubPoolDetails.yieldGenerated
