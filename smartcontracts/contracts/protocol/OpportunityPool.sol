@@ -18,6 +18,11 @@ import {ISeniorPool} from "../interfaces/ISeniorPool.sol";
 import {ConfigHelper} from "./ConfigHelper.sol";
 
 contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
+    /////////////////////////////////
+    ///////   Error Messages   ///////
+    /////////////////////////////////
+    error opportunityPool__InvalidAddress();
+
     ReignConfig public reignConfig;
 
     using ConfigHelper for ReignConfig;
@@ -57,8 +62,16 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     SubPoolDetails public s_seniorSubPoolDetails;
     SubPoolDetails public s_juniorSubPoolDetails;
 
-    event Deposited(address indexed executor, uint8 indexed subpool, uint256 amount);
-    event withdrew(address indexed executor, uint8 indexed subpool, uint256 amount);
+    event Deposited(
+        address indexed executor,
+        uint8 indexed subpool,
+        uint256 amount
+    );
+    event withdrew(
+        address indexed executor,
+        uint8 indexed subpool,
+        uint256 amount
+    );
 
     function initialize(
         ReignConfig _reignconfig,
@@ -69,18 +82,24 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         uint256 _paymentFrequencyInDays,
         uint8 _loanType
     ) external override initializer {
-        require(address(_reignconfig) != address(0), "Reign config address is zero");
+        if (address(_reignconfig) == address(0))
+            revert opportunityPool__InvalidAddress();
         reignConfig = _reignconfig;
         address owner = reignConfig.reignAdminAddress();
-        require(owner != address(0), "Owner address is zero");
-        opportunityManager = IOpportunityManager(reignConfig.getOpportunityOrigination());
+        if (owner == address(0)) revert opportunityPool__InvalidAddress();
+        opportunityManager = IOpportunityManager(
+            reignConfig.getOpportunityOrigination()
+        );
         investor = IInvestor(reignConfig.investorContractAddress());
 
         _BaseUpgradeablePausable_init(owner);
         usdcToken = IERC20(reignConfig.usdcAddress());
         reignToken = IReignCoin(reignConfig.reignCoinAddress());
         _setRoleAdmin(Constants.getSeniorPoolRole(), Constants.getAdminRole());
-        _setupRole(Constants.getSeniorPoolRole(), reignConfig.seniorPoolAddress());
+        _setupRole(
+            Constants.getSeniorPoolRole(),
+            reignConfig.seniorPoolAddress()
+        );
         _setRoleAdmin(Constants.getBorrowerRole(), Constants.getAdminRole());
         _setRoleAdmin(Constants.getPoolLockerRole(), Constants.getAdminRole());
         _setupRole(Constants.getPoolLockerRole(), owner);
@@ -100,9 +119,13 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             // follow 4x leverage ratio
             s_seniorSubPoolDetails.isPoolLocked = true;
             uint256 temp = s_loanAmount.div(reignConfig.getLeverageRatio() + 1);
-            s_seniorSubPoolDetails.totalDepositable = temp.mul(reignConfig.getLeverageRatio());
+            s_seniorSubPoolDetails.totalDepositable = temp.mul(
+                reignConfig.getLeverageRatio()
+            );
 
-            s_juniorSubPoolDetails.totalDepositable = s_loanAmount - s_seniorSubPoolDetails.totalDepositable;
+            s_juniorSubPoolDetails.totalDepositable =
+                s_loanAmount -
+                s_seniorSubPoolDetails.totalDepositable;
         } else {
             s_juniorSubPoolDetails.isPoolLocked = true;
             s_seniorSubPoolDetails.totalDepositable = s_loanAmount;
@@ -111,27 +134,41 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         s_totalRepayments = s_loanTenureInDays.div(s_paymentFrequencyInDays);
 
         if (s_loanType == 1) {
-            s_emiAmount =
-                Accounting.getTermLoanEMI(s_loanAmount, s_loanInterest, s_totalRepayments, s_paymentFrequencyInDays);
+            s_emiAmount = Accounting.getTermLoanEMI(
+                s_loanAmount,
+                s_loanInterest,
+                s_totalRepayments,
+                s_paymentFrequencyInDays
+            );
         } else {
-            s_emiAmount = Accounting.getBulletLoanEMI(s_loanAmount, s_loanInterest, s_paymentFrequencyInDays);
+            s_emiAmount = Accounting.getBulletLoanEMI(
+                s_loanAmount,
+                s_loanInterest,
+                s_paymentFrequencyInDays
+            );
         }
 
-        s_dailyOverdueInterestRate = reignConfig.getOverDueFee().div(Constants.oneYearInDays());
-
-        (s_seniorYieldPercentage, s_juniorYieldPercentage) = Accounting.getYieldPercentage(
-            reignConfig.getReignFee(),
-            reignConfig.getJuniorSubpoolFee(),
-            s_loanType == 1,
-            s_emiAmount,
-            s_loanAmount,
-            s_totalRepayments,
-            s_loanInterest,
-            reignConfig.getLeverageRatio(),
-            s_loanTenureInDays
+        s_dailyOverdueInterestRate = reignConfig.getOverDueFee().div(
+            Constants.oneYearInDays()
         );
 
-        (s_seniorOverduePercentage, s_juniorOverduePercentage) = getOverDuePercentage();
+        (s_seniorYieldPercentage, s_juniorYieldPercentage) = Accounting
+            .getYieldPercentage(
+                reignConfig.getReignFee(),
+                reignConfig.getJuniorSubpoolFee(),
+                s_loanType == 1,
+                s_emiAmount,
+                s_loanAmount,
+                s_totalRepayments,
+                s_loanInterest,
+                reignConfig.getLeverageRatio(),
+                s_loanTenureInDays
+            );
+
+        (
+            s_seniorOverduePercentage,
+            s_juniorOverduePercentage
+        ) = getOverDuePercentage();
         bool success = usdcToken.approve(address(this), 2 ** 256 - 1);
         require(success, "approve failed");
     }
@@ -141,47 +178,83 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     ////////////////////////////////////
 
     modifier onlyBorrower() {
-        require(hasRole(Constants.getBorrowerRole(), msg.sender), "Caller is not borrower");
+        require(
+            hasRole(Constants.getBorrowerRole(), msg.sender),
+            "Caller is not borrower"
+        );
         _;
     }
 
     modifier onlyPoolLocker() {
-        require(hasRole(Constants.getPoolLockerRole(), msg.sender), "Caller is not pool locker");
+        require(
+            hasRole(Constants.getPoolLockerRole(), msg.sender),
+            "Caller is not pool locker"
+        );
         _;
     }
 
-    function deposit(uint8 _subpoolId, uint256 amount) external override nonReentrant {
-        require(_subpoolId <= uint8(SubPool.SeniorSubpool), "Invalid subpool id");
+    function deposit(
+        uint8 _subpoolId,
+        uint256 amount
+    ) external override nonReentrant {
+        require(
+            _subpoolId <= uint8(SubPool.SeniorSubpool),
+            "Invalid subpool id"
+        );
         require(amount > 0, "Amount should be greater than zero");
 
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
-            require(s_seniorSubPoolDetails.isPoolLocked == false, "Senior subpool is locked");
-            require(hasRole(Constants.getSeniorPoolRole(), msg.sender), "Caller is doesn't have role in senior pool");
-            uint256 totalAmountAfterDeposit = amount.add(s_seniorSubPoolDetails.depositedAmount);
+            require(
+                s_seniorSubPoolDetails.isPoolLocked == false,
+                "Senior subpool is locked"
+            );
+            require(
+                hasRole(Constants.getSeniorPoolRole(), msg.sender),
+                "Caller is doesn't have role in senior pool"
+            );
+            uint256 totalAmountAfterDeposit = amount.add(
+                s_seniorSubPoolDetails.depositedAmount
+            );
 
             require(
-                totalAmountAfterDeposit <= s_seniorSubPoolDetails.totalDepositable,
+                totalAmountAfterDeposit <=
+                    s_seniorSubPoolDetails.totalDepositable,
                 "Senior subpool deposit limit exceeded"
             );
-            s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails.depositedAmount.add(amount);
+            s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails
+                .depositedAmount
+                .add(amount);
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
-            require(s_juniorSubPoolDetails.isPoolLocked == false, "Junior subpool is locked");
-            uint256 totalAmountAfterDeposit = amount.add(s_juniorSubPoolDetails.depositedAmount);
+            require(
+                s_juniorSubPoolDetails.isPoolLocked == false,
+                "Junior subpool is locked"
+            );
+            uint256 totalAmountAfterDeposit = amount.add(
+                s_juniorSubPoolDetails.depositedAmount
+            );
 
             require(
-                totalAmountAfterDeposit <= s_juniorSubPoolDetails.totalDepositable,
+                totalAmountAfterDeposit <=
+                    s_juniorSubPoolDetails.totalDepositable,
                 "Junior subpool deposit limit exceeded"
             );
-            s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails.depositedAmount.add(amount);
+            s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails
+                .depositedAmount
+                .add(amount);
 
-            s_stakingBalance[msg.sender] = s_stakingBalance[msg.sender].add(amount);
+            s_stakingBalance[msg.sender] = s_stakingBalance[msg.sender].add(
+                amount
+            );
             isStaking[msg.sender] = true;
 
             if (investor.getInvestor(msg.sender, s_opportunityID) == false) {
                 investor.addOpportunity(msg.sender, s_opportunityID);
             }
 
-            if (totalAmountAfterDeposit >= s_juniorSubPoolDetails.totalDepositable) {
+            if (
+                totalAmountAfterDeposit >=
+                s_juniorSubPoolDetails.totalDepositable
+            ) {
                 s_seniorSubPoolDetails.isPoolLocked = false;
             }
         }
@@ -191,10 +264,22 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         emit Deposited(msg.sender, _subpoolId, amount);
     }
 
-    function drawdown() public override nonReentrant whenNotPaused onlyBorrower {
-        require(opportunityManager.isDrawndown(s_opportunityID) == false, "Drawdown already done");
+    function drawdown()
+        public
+        override
+        nonReentrant
+        whenNotPaused
+        onlyBorrower
+    {
+        require(
+            opportunityManager.isDrawndown(s_opportunityID) == false,
+            "Drawdown already done"
+        );
         require(s_isDrawdownsPaused == false, "Drawdowns are paused");
-        require(s_poolBalance == s_loanAmount, "Pool balance is not equal to loan amount");
+        require(
+            s_poolBalance == s_loanAmount,
+            "Pool balance is not equal to loan amount"
+        );
 
         uint256 amount = s_poolBalance;
         s_poolBalance = 0;
@@ -206,17 +291,27 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function repayment() public override nonReentrant onlyBorrower {
-        require(s_repaymentCounter <= s_totalRepayments, "All repayments are done");
-        require(opportunityManager.isDrawndown(s_opportunityID), "Drawdown is not done");
+        require(
+            s_repaymentCounter <= s_totalRepayments,
+            "All repayments are done"
+        );
+        require(
+            opportunityManager.isDrawndown(s_opportunityID),
+            "Drawdown is not done"
+        );
 
         uint256 currentRepaymentTime = block.timestamp;
         uint256 currentRepaymentDue = nextRepaymentTime();
         uint256 overDueFee;
 
         if (currentRepaymentTime > currentRepaymentDue) {
-            uint256 overDueSeconds = currentRepaymentTime.sub(currentRepaymentDue).div(86400);
-            overDueFee =
-                overDueSeconds.mul(s_dailyOverdueInterestRate.div(100)).mul(s_emiAmount).div(Constants.sixDecimals());
+            uint256 overDueSeconds = currentRepaymentTime
+                .sub(currentRepaymentDue)
+                .div(86400);
+            overDueFee = overDueSeconds
+                .mul(s_dailyOverdueInterestRate.div(100))
+                .mul(s_emiAmount)
+                .div(Constants.sixDecimals());
         }
 
         //Term loan
@@ -226,54 +321,84 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
 
             //interest from emi
 
-            uint256 interest =
-                Accounting.getTermLoanInterest(s_totalOutstandingPrincipal, s_paymentFrequencyInDays, s_loanInterest);
+            uint256 interest = Accounting.getTermLoanInterest(
+                s_totalOutstandingPrincipal,
+                s_paymentFrequencyInDays,
+                s_loanInterest
+            );
             uint256 principalReceived = s_emiAmount.sub(interest);
-            s_totalOutstandingPrincipal =
-                s_totalOutstandingPrincipal.sub(principalReceived.sub(reignConfig.getAdjustmentOffset()));
+            s_totalOutstandingPrincipal = s_totalOutstandingPrincipal.sub(
+                principalReceived.sub(reignConfig.getAdjustmentOffset())
+            );
 
-            uint256 juniorPoolPrincipalportion = principalReceived.div(reignConfig.getLeverageRatio().add(1));
+            uint256 juniorPoolPrincipalportion = principalReceived.div(
+                reignConfig.getLeverageRatio().add(1)
+            );
 
-            uint256 seniorPoolPrincipalportion = juniorPoolPrincipalportion.mul(reignConfig.getLeverageRatio());
+            uint256 seniorPoolPrincipalportion = juniorPoolPrincipalportion.mul(
+                reignConfig.getLeverageRatio()
+            );
 
-            s_seniorSubPoolDetails.depositedAmount =
-                s_seniorSubPoolDetails.depositedAmount.add(seniorPoolPrincipalportion);
+            s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails
+                .depositedAmount
+                .add(seniorPoolPrincipalportion);
 
-            s_juniorSubPoolDetails.depositedAmount =
-                s_juniorSubPoolDetails.depositedAmount.add(juniorPoolPrincipalportion);
+            s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails
+                .depositedAmount
+                .add(juniorPoolPrincipalportion);
 
             //Yield Distribution
             uint256 seniorPoolInterest;
             uint256 juniorPoolInterest;
-            (seniorPoolInterest, juniorPoolInterest) = Accounting.getInterestDistribution(
-                reignConfig.getReignFee(),
-                reignConfig.getJuniorSubpoolFee(),
-                interest,
-                reignConfig.getLeverageRatio(),
-                s_loanAmount,
-                s_seniorSubPoolDetails.totalDepositable
-            );
-            s_seniorSubPoolDetails.yieldGenerated = s_seniorSubPoolDetails.yieldGenerated.add(seniorPoolInterest);
-            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails.yieldGenerated.add(juniorPoolInterest);
+            (seniorPoolInterest, juniorPoolInterest) = Accounting
+                .getInterestDistribution(
+                    reignConfig.getReignFee(),
+                    reignConfig.getJuniorSubpoolFee(),
+                    interest,
+                    reignConfig.getLeverageRatio(),
+                    s_loanAmount,
+                    s_seniorSubPoolDetails.totalDepositable
+                );
+            s_seniorSubPoolDetails.yieldGenerated = s_seniorSubPoolDetails
+                .yieldGenerated
+                .add(seniorPoolInterest);
+            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails
+                .yieldGenerated
+                .add(juniorPoolInterest);
 
             //Overdue Amount Distribution
-            s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails.overdueGenerated.add(
-                s_juniorOverduePercentage.mul(overDueFee).div(Constants.sixDecimals())
-            );
-            s_seniorSubPoolDetails.overdueGenerated = s_seniorSubPoolDetails.overdueGenerated.add(
-                s_seniorOverduePercentage.mul(overDueFee).div(Constants.sixDecimals())
-            );
+            s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails
+                .overdueGenerated
+                .add(
+                    s_juniorOverduePercentage.mul(overDueFee).div(
+                        Constants.sixDecimals()
+                    )
+                );
+            s_seniorSubPoolDetails.overdueGenerated = s_seniorSubPoolDetails
+                .overdueGenerated
+                .add(
+                    s_seniorOverduePercentage.mul(overDueFee).div(
+                        Constants.sixDecimals()
+                    )
+                );
 
             //Sending funds in Rign treasury
-            uint256 reignTreasury = interest.mul(reignConfig.getReignFee()).div(Constants.sixDecimals());
-            reignTreasury += overDueFee.mul(reignConfig.getReignFee()).div(Constants.sixDecimals());
+            uint256 reignTreasury = interest.mul(reignConfig.getReignFee()).div(
+                Constants.sixDecimals()
+            );
+            reignTreasury += overDueFee.mul(reignConfig.getReignFee()).div(
+                Constants.sixDecimals()
+            );
 
             amount = amount.add(overDueFee);
             s_poolBalance = s_poolBalance.add(reignTreasury);
 
             usdcToken.safeTransferFrom(msg.sender, address(this), amount);
 
-            usdcToken.transfer(reignConfig.reignTreasuryAddress(), reignTreasury);
+            usdcToken.transfer(
+                reignConfig.reignTreasuryAddress(),
+                reignTreasury
+            );
         } else {
             uint256 amount = s_emiAmount;
             s_totalRepaidAmount += amount;
@@ -281,34 +406,55 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             //Yield Distribution
             uint256 seniorPoolInterest;
             uint256 juniorPoolInterest;
-            (seniorPoolInterest, juniorPoolInterest) = Accounting.getInterestDistribution(
-                reignConfig.getReignFee(),
-                reignConfig.getJuniorSubpoolFee(),
-                amount,
-                reignConfig.getLeverageRatio(),
-                s_loanAmount,
-                s_seniorSubPoolDetails.totalDepositable
-            );
-            s_seniorSubPoolDetails.yieldGenerated = s_seniorSubPoolDetails.yieldGenerated.add(seniorPoolInterest);
-            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails.yieldGenerated.add(juniorPoolInterest);
+            (seniorPoolInterest, juniorPoolInterest) = Accounting
+                .getInterestDistribution(
+                    reignConfig.getReignFee(),
+                    reignConfig.getJuniorSubpoolFee(),
+                    amount,
+                    reignConfig.getLeverageRatio(),
+                    s_loanAmount,
+                    s_seniorSubPoolDetails.totalDepositable
+                );
+            s_seniorSubPoolDetails.yieldGenerated = s_seniorSubPoolDetails
+                .yieldGenerated
+                .add(seniorPoolInterest);
+            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails
+                .yieldGenerated
+                .add(juniorPoolInterest);
 
             //Overdue Amount Distribution
-            s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails.overdueGenerated.add(
-                s_juniorOverduePercentage.mul(overDueFee).div(Constants.sixDecimals())
-            );
-            s_seniorSubPoolDetails.overdueGenerated = s_seniorSubPoolDetails.overdueGenerated.add(
-                s_seniorOverduePercentage.mul(overDueFee).div(Constants.sixDecimals())
-            );
+            s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails
+                .overdueGenerated
+                .add(
+                    s_juniorOverduePercentage.mul(overDueFee).div(
+                        Constants.sixDecimals()
+                    )
+                );
+            s_seniorSubPoolDetails.overdueGenerated = s_seniorSubPoolDetails
+                .overdueGenerated
+                .add(
+                    s_seniorOverduePercentage.mul(overDueFee).div(
+                        Constants.sixDecimals()
+                    )
+                );
 
             //Sending funds in Rign treasury
-            uint256 reignTreasury = amount.mul(reignConfig.getReignFee()).div(Constants.sixDecimals());
-            reignTreasury += (overDueFee.mul(reignConfig.getReignFee()).div(Constants.sixDecimals()));
+            uint256 reignTreasury = amount.mul(reignConfig.getReignFee()).div(
+                Constants.sixDecimals()
+            );
+            reignTreasury += (
+                overDueFee.mul(reignConfig.getReignFee()).div(
+                    Constants.sixDecimals()
+                )
+            );
 
             if (s_repaymentCounter == s_totalRepayments) {
                 amount = amount.add(s_loanAmount);
                 s_totalRepaidAmount = s_totalRepaidAmount.add(s_loanAmount);
-                s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails.totalDepositable;
-                s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails.totalDepositable;
+                s_seniorSubPoolDetails.depositedAmount = s_seniorSubPoolDetails
+                    .totalDepositable;
+                s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails
+                    .totalDepositable;
             }
 
             amount = amount.add(overDueFee);
@@ -316,25 +462,36 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
 
             usdcToken.safeTransferFrom(msg.sender, address(this), amount);
 
-            usdcToken.transfer(reignConfig.reignTreasuryAddress(), reignTreasury);
+            usdcToken.transfer(
+                reignConfig.reignTreasuryAddress(),
+                reignTreasury
+            );
         }
 
         if (s_repaymentCounter == s_totalRepayments) {
             opportunityManager.markRepaid(s_opportunityID);
-            ISeniorPool(reignConfig.seniorPoolAddress()).withdrawFromOpportunity(false, s_opportunityID, 0);
+            ISeniorPool(reignConfig.seniorPoolAddress())
+                .withdrawFromOpportunity(false, s_opportunityID, 0);
 
             //Autosend all funs to senior pool since all repayments are done
-            uint256 seniorAmount = s_seniorSubPoolDetails.depositedAmount.add(s_seniorSubPoolDetails.yieldGenerated);
+            uint256 seniorAmount = s_seniorSubPoolDetails.depositedAmount.add(
+                s_seniorSubPoolDetails.yieldGenerated
+            );
 
             if (s_seniorSubPoolDetails.overdueGenerated > 0) {
-                seniorAmount = seniorAmount.add(s_seniorSubPoolDetails.overdueGenerated);
+                seniorAmount = seniorAmount.add(
+                    s_seniorSubPoolDetails.overdueGenerated
+                );
                 s_seniorSubPoolDetails.overdueGenerated = 0;
             }
 
             s_seniorSubPoolDetails.depositedAmount = 0;
             s_seniorSubPoolDetails.yieldGenerated = 0;
             s_poolBalance = s_poolBalance.sub(seniorAmount);
-            usdcToken.safeTransfer(reignConfig.seniorPoolAddress(), seniorAmount);
+            usdcToken.safeTransfer(
+                reignConfig.seniorPoolAddress(),
+                seniorAmount
+            );
         } else {
             s_repaymentCounter = s_repaymentCounter.add(1);
         }
@@ -346,18 +503,37 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
      * @return Returns the amount withdrawn
      * @dev Only the investor can withdraw funds
      */
-    function withdrawAll(uint8 _subpoolId) external override nonReentrant whenNotPaused returns (uint256) {
-        require(_subpoolId <= uint8(SubPool.SeniorSubpool), "Invalid subpool id");
-        require(opportunityManager.isRepaid(s_opportunityID), "Opportunity is not repaid");
+    function withdrawAll(
+        uint8 _subpoolId
+    ) external override nonReentrant whenNotPaused returns (uint256) {
+        require(
+            _subpoolId <= uint8(SubPool.SeniorSubpool),
+            "Invalid subpool id"
+        );
+        require(
+            opportunityManager.isRepaid(s_opportunityID),
+            "Opportunity is not repaid"
+        );
 
         uint256 amount;
 
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
-            require(s_seniorSubPoolDetails.isPoolLocked == false, "Senior subpool is locked");
-            require(hasRole(Constants.getSeniorPoolRole(), msg.sender), "Caller is doesn't have role in senior pool");
-            require(s_seniorSubPoolDetails.depositedAmount > 0, "Senior subpool deposited amount is zero");
+            require(
+                s_seniorSubPoolDetails.isPoolLocked == false,
+                "Senior subpool is locked"
+            );
+            require(
+                hasRole(Constants.getSeniorPoolRole(), msg.sender),
+                "Caller is doesn't have role in senior pool"
+            );
+            require(
+                s_seniorSubPoolDetails.depositedAmount > 0,
+                "Senior subpool deposited amount is zero"
+            );
 
-            amount = s_seniorSubPoolDetails.depositedAmount.add(s_seniorSubPoolDetails.yieldGenerated);
+            amount = s_seniorSubPoolDetails.depositedAmount.add(
+                s_seniorSubPoolDetails.yieldGenerated
+            );
 
             if (s_seniorSubPoolDetails.overdueGenerated > 0) {
                 amount = amount.add(s_seniorSubPoolDetails.overdueGenerated);
@@ -367,17 +543,26 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             s_seniorSubPoolDetails.depositedAmount = 0;
             s_seniorSubPoolDetails.yieldGenerated = 0;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
-            require(s_juniorSubPoolDetails.isPoolLocked == false, "Junior subpool is locked");
-            require(isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0, "Caller is not staking");
+            require(
+                s_juniorSubPoolDetails.isPoolLocked == false,
+                "Junior subpool is locked"
+            );
+            require(
+                isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0,
+                "Caller is not staking"
+            );
             uint256 offset = reignConfig.getAdjustmentOffset();
 
             require(
-                s_stakingBalance[msg.sender] <= s_juniorSubPoolDetails.depositedAmount.add(offset),
+                s_stakingBalance[msg.sender] <=
+                    s_juniorSubPoolDetails.depositedAmount.add(offset),
                 "Staking balance is greater than deposited amount"
             );
 
-            uint256 yieldEarned =
-                s_juniorSubPoolDetails.yieldGenerated.mul(s_stakingBalance[msg.sender]).div(Constants.sixDecimals());
+            uint256 yieldEarned = s_juniorSubPoolDetails
+                .yieldGenerated
+                .mul(s_stakingBalance[msg.sender])
+                .div(Constants.sixDecimals());
             yieldEarned = yieldEarned.sub(offset);
 
             require(
@@ -385,19 +570,29 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
                 "Yield earned is greater than total yield generated"
             );
 
-            uint256 userStakingBalance = s_stakingBalance[msg.sender].sub(offset);
-            s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails.depositedAmount.sub(userStakingBalance);
-            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails.yieldGenerated.sub(yieldEarned);
+            uint256 userStakingBalance = s_stakingBalance[msg.sender].sub(
+                offset
+            );
+            s_juniorSubPoolDetails.depositedAmount = s_juniorSubPoolDetails
+                .depositedAmount
+                .sub(userStakingBalance);
+            s_juniorSubPoolDetails.yieldGenerated = s_juniorSubPoolDetails
+                .yieldGenerated
+                .sub(yieldEarned);
 
             isStaking[msg.sender] = false;
             amount = userStakingBalance.add(yieldEarned);
 
             if (s_juniorSubPoolDetails.overdueGenerated > 0) {
-                uint256 overdueEarned = (s_juniorSubPoolDetails.overdueGenerated.mul(s_stakingBalance[msg.sender])).div(
-                    Constants.sixDecimals()
-                );
+                uint256 overdueEarned = (
+                    s_juniorSubPoolDetails.overdueGenerated.mul(
+                        s_stakingBalance[msg.sender]
+                    )
+                ).div(Constants.sixDecimals());
                 amount = amount.add(overdueEarned);
-                s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails.overdueGenerated.sub(overdueEarned);
+                s_juniorSubPoolDetails.overdueGenerated = s_juniorSubPoolDetails
+                    .overdueGenerated
+                    .sub(overdueEarned);
             }
 
             investor.removeOpportunity(msg.sender, s_opportunityID);
@@ -408,20 +603,32 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         return amount;
     }
 
-    function getUserWithdrawableAmount() external view override returns (uint256) {
-        require(isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0, "Caller is not staking");
+    function getUserWithdrawableAmount()
+        external
+        view
+        override
+        returns (uint256)
+    {
+        require(
+            isStaking[msg.sender] && s_stakingBalance[msg.sender] > 0,
+            "Caller is not staking"
+        );
         uint256 amount = 0;
 
         if (opportunityManager.isRepaid(s_opportunityID)) {
-            uint256 yieldEarned =
-                s_juniorSubPoolDetails.yieldGenerated.mul(s_stakingBalance[msg.sender]).div(Constants.sixDecimals());
+            uint256 yieldEarned = s_juniorSubPoolDetails
+                .yieldGenerated
+                .mul(s_stakingBalance[msg.sender])
+                .div(Constants.sixDecimals());
 
             amount = s_stakingBalance[msg.sender].add(yieldEarned);
 
             if (s_juniorSubPoolDetails.overdueGenerated > 0) {
-                uint256 overdueEarned = (s_juniorSubPoolDetails.overdueGenerated.mul(s_stakingBalance[msg.sender])).div(
-                    Constants.sixDecimals()
-                );
+                uint256 overdueEarned = (
+                    s_juniorSubPoolDetails.overdueGenerated.mul(
+                        s_stakingBalance[msg.sender]
+                    )
+                ).div(Constants.sixDecimals());
                 amount = amount.add(overdueEarned);
             }
         }
@@ -429,8 +636,14 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function getRepaymentAmount() external view override returns (uint256) {
-        require(s_repaymentCounter <= s_totalRepayments, "All repayments are done");
-        require(opportunityManager.isDrawndown(s_opportunityID), "Drawdown is not done");
+        require(
+            s_repaymentCounter <= s_totalRepayments,
+            "All repayments are done"
+        );
+        require(
+            opportunityManager.isDrawndown(s_opportunityID),
+            "Drawdown is not done"
+        );
 
         uint256 amount;
         if (s_loanType == 1) {
@@ -440,10 +653,13 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             uint256 overDueFee;
 
             if (currentTime > currentRepaymentDue) {
-                uint256 overDueSeconds = currentTime.sub(currentRepaymentDue).div(86400);
-                overDueFee = overDueSeconds.mul(s_dailyOverdueInterestRate.div(100)).mul(s_emiAmount).div(
-                    Constants.sixDecimals()
-                );
+                uint256 overDueSeconds = currentTime
+                    .sub(currentRepaymentDue)
+                    .div(86400);
+                overDueFee = overDueSeconds
+                    .mul(s_dailyOverdueInterestRate.div(100))
+                    .mul(s_emiAmount)
+                    .div(Constants.sixDecimals());
             }
 
             amount = amount.add(overDueFee);
@@ -454,10 +670,13 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             uint256 overDueFee;
 
             if (currentTime > currentRepaymentDue) {
-                uint256 overDueSeconds = currentTime.sub(currentRepaymentDue).div(86400);
-                overDueFee = overDueSeconds.mul(s_dailyOverdueInterestRate.div(100)).mul(s_emiAmount).div(
-                    Constants.sixDecimals()
-                );
+                uint256 overDueSeconds = currentTime
+                    .sub(currentRepaymentDue)
+                    .div(86400);
+                overDueFee = overDueSeconds
+                    .mul(s_dailyOverdueInterestRate.div(100))
+                    .mul(s_emiAmount)
+                    .div(Constants.sixDecimals());
             }
 
             amount = amount.add(overDueFee);
@@ -468,34 +687,65 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         return amount;
     }
 
-    function getOverDuePercentage() public view override returns (uint256, uint256) {
-        uint256 yield =
-            Accounting.getTermLoanInterest(s_totalOutstandingPrincipal, s_paymentFrequencyInDays, s_loanInterest);
-        uint256 juniorInvestment = s_loanAmount.div(reignConfig.getLeverageRatio().add(1));
-        uint256 seniorInvestment = juniorInvestment.mul(reignConfig.getLeverageRatio());
+    function getOverDuePercentage()
+        public
+        view
+        override
+        returns (uint256, uint256)
+    {
+        uint256 yield = Accounting.getTermLoanInterest(
+            s_totalOutstandingPrincipal,
+            s_paymentFrequencyInDays,
+            s_loanInterest
+        );
+        uint256 juniorInvestment = s_loanAmount.div(
+            reignConfig.getLeverageRatio().add(1)
+        );
+        uint256 seniorInvestment = juniorInvestment.mul(
+            reignConfig.getLeverageRatio()
+        );
 
-        uint256 _seniorOverduePercentage = (seniorInvestment.mul(s_seniorYieldPercentage)).div(yield);
-        uint256 _juniorOverduePercentage = (juniorInvestment.mul(s_juniorYieldPercentage)).div(yield);
+        uint256 _seniorOverduePercentage = (
+            seniorInvestment.mul(s_seniorYieldPercentage)
+        ).div(yield);
+        uint256 _juniorOverduePercentage = (
+            juniorInvestment.mul(s_juniorYieldPercentage)
+        ).div(yield);
 
         return (_seniorOverduePercentage, _juniorOverduePercentage);
     }
 
     function nextRepaymentTime() public view override returns (uint256) {
-        require(s_repaymentCounter <= s_totalRepayments, "All repayments are done");
-        uint256 nextRepaymentDue = s_repaymentStartTime.add(s_repaymentCounter.mul(s_paymentFrequencyInDays).mul(86400));
+        require(
+            s_repaymentCounter <= s_totalRepayments,
+            "All repayments are done"
+        );
+        uint256 nextRepaymentDue = s_repaymentStartTime.add(
+            s_repaymentCounter.mul(s_paymentFrequencyInDays).mul(86400)
+        );
         return nextRepaymentDue;
     }
 
-    function getSeniorTotalDepositable() external view override returns (uint256) {
+    function getSeniorTotalDepositable()
+        external
+        view
+        override
+        returns (uint256)
+    {
         return s_seniorSubPoolDetails.totalDepositable;
     }
 
     function getSeniorProfit() external view override returns (uint256) {
-        return s_seniorSubPoolDetails.yieldGenerated + s_seniorSubPoolDetails.overdueGenerated;
+        return
+            s_seniorSubPoolDetails.yieldGenerated +
+            s_seniorSubPoolDetails.overdueGenerated;
     }
 
     function lockPool(uint8 _subpoolId) public onlyPoolLocker {
-        require(_subpoolId <= uint8(SubPool.SeniorSubpool), "Invalid subpool id");
+        require(
+            _subpoolId <= uint8(SubPool.SeniorSubpool),
+            "Invalid subpool id"
+        );
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
             s_seniorSubPoolDetails.isPoolLocked = true;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
@@ -504,7 +754,10 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     }
 
     function unlockPool(uint8 _subpoolId) public onlyPoolLocker {
-        require(_subpoolId <= uint8(SubPool.SeniorSubpool), "Invalid subpool id");
+        require(
+            _subpoolId <= uint8(SubPool.SeniorSubpool),
+            "Invalid subpool id"
+        );
         if (_subpoolId == uint8(SubPool.SeniorSubpool)) {
             s_seniorSubPoolDetails.isPoolLocked = false;
         } else if (_subpoolId == uint8(SubPool.JuniorSubpool)) {
@@ -520,17 +773,30 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         s_isDrawdownsPaused = false;
     }
 
-    function getOpportunityName() external view override returns (string memory) {
+    function getOpportunityName()
+        external
+        view
+        override
+        returns (string memory)
+    {
         return opportunityManager.getOpportunityName(s_opportunityID);
     }
 
     function writeOffOpportunity() external override {
-        require(opportunityManager.isWrittenOff(s_opportunityID) == true, "Opportunity is not write off");
-        require(msg.sender == reignConfig.getOpportunityOrigination(), "Caller is not opportunity Manager");
+        require(
+            opportunityManager.isWrittenOff(s_opportunityID) == true,
+            "Opportunity is not write off"
+        );
+        require(
+            msg.sender == reignConfig.getOpportunityOrigination(),
+            "Caller is not opportunity Manager"
+        );
 
         uint256 temp = s_loanAmount.div(reignConfig.getLeverageRatio() + 1);
         uint256 tempSenior = temp.mul(reignConfig.getLeverageRatio());
-        uint256 estimatedSeniorYield = s_seniorYieldPercentage.mul(tempSenior).div(Constants.sixDecimals());
+        uint256 estimatedSeniorYield = s_seniorYieldPercentage
+            .mul(tempSenior)
+            .div(Constants.sixDecimals());
 
         uint256 remainingOverdue;
         if (s_loanType == 1) {
@@ -539,10 +805,13 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             uint256 overDueFee;
 
             if (currentTime > currentRepaymentDue) {
-                uint256 overDueSeconds = currentTime.sub(currentRepaymentDue).div(86400);
-                overDueFee = overDueSeconds.mul(s_dailyOverdueInterestRate.div(100)).mul(s_emiAmount).div(
-                    Constants.sixDecimals()
-                );
+                uint256 overDueSeconds = currentTime
+                    .sub(currentRepaymentDue)
+                    .div(86400);
+                overDueFee = overDueSeconds
+                    .mul(s_dailyOverdueInterestRate.div(100))
+                    .mul(s_emiAmount)
+                    .div(Constants.sixDecimals());
             }
 
             remainingOverdue = overDueFee;
@@ -553,29 +822,42 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
             uint256 overDueFee;
 
             if (currentTime > currentRepaymentDue) {
-                uint256 overDueSeconds = currentTime.sub(currentRepaymentDue).div(86400);
-                overDueFee =
-                    overDueSeconds.mul(s_dailyOverdueInterestRate.div(100)).mul(amount).div(Constants.sixDecimals());
+                uint256 overDueSeconds = currentTime
+                    .sub(currentRepaymentDue)
+                    .div(86400);
+                overDueFee = overDueSeconds
+                    .mul(s_dailyOverdueInterestRate.div(100))
+                    .mul(amount)
+                    .div(Constants.sixDecimals());
             }
             remainingOverdue = overDueFee;
         }
 
-        remainingOverdue = s_seniorOverduePercentage.mul(remainingOverdue).div(Constants.sixDecimals());
-        uint256 estimateOverDue = remainingOverdue.add(s_seniorSubPoolDetails.overdueGenerated);
+        remainingOverdue = s_seniorOverduePercentage.mul(remainingOverdue).div(
+            Constants.sixDecimals()
+        );
+        uint256 estimateOverDue = remainingOverdue.add(
+            s_seniorSubPoolDetails.overdueGenerated
+        );
 
-        uint256 estimatedSeniorPoolAmount =
-            estimateOverDue + estimatedSeniorYield + s_seniorSubPoolDetails.totalDepositable;
+        uint256 estimatedSeniorPoolAmount = estimateOverDue +
+            estimatedSeniorYield +
+            s_seniorSubPoolDetails.totalDepositable;
 
         if (s_poolBalance > estimatedSeniorPoolAmount) {
-            ISeniorPool(reignConfig.seniorPoolAddress()).withdrawFromOpportunity(
-                true, s_opportunityID, estimatedSeniorPoolAmount
-            );
+            ISeniorPool(reignConfig.seniorPoolAddress())
+                .withdrawFromOpportunity(
+                    true,
+                    s_opportunityID,
+                    estimatedSeniorPoolAmount
+                );
 
             s_seniorSubPoolDetails.depositedAmount = 0;
             s_seniorSubPoolDetails.yieldGenerated = 0;
             s_seniorSubPoolDetails.overdueGenerated = 0;
         } else {
-            ISeniorPool(reignConfig.seniorPoolAddress()).withdrawFromOpportunity(true, s_opportunityID, s_poolBalance);
+            ISeniorPool(reignConfig.seniorPoolAddress())
+                .withdrawFromOpportunity(true, s_opportunityID, s_poolBalance);
 
             s_seniorSubPoolDetails.depositedAmount = 0;
             s_seniorSubPoolDetails.yieldGenerated = 0;
@@ -583,10 +865,20 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         }
     }
 
-    function getSeniorPoolWithdrawableAmount() external view override returns (uint256 amount) {
-        require(s_seniorSubPoolDetails.isPoolLocked == false, "Senior subpool is locked");
+    function getSeniorPoolWithdrawableAmount()
+        external
+        view
+        override
+        returns (uint256 amount)
+    {
+        require(
+            s_seniorSubPoolDetails.isPoolLocked == false,
+            "Senior subpool is locked"
+        );
 
-        amount = s_seniorSubPoolDetails.depositedAmount.add(s_seniorSubPoolDetails.yieldGenerated);
+        amount = s_seniorSubPoolDetails.depositedAmount.add(
+            s_seniorSubPoolDetails.yieldGenerated
+        );
 
         amount = amount.add(s_seniorSubPoolDetails.overdueGenerated);
 
