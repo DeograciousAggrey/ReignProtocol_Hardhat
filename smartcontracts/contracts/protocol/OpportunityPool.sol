@@ -96,16 +96,16 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
         usdcToken = IERC20(reignConfig.usdcAddress());
         reignToken = IReignCoin(reignConfig.reignCoinAddress());
         _setRoleAdmin(Constants.getSeniorPoolRole(), Constants.getAdminRole());
-        _setupRole(
+        _grantRole(
             Constants.getSeniorPoolRole(),
             reignConfig.seniorPoolAddress()
         );
         _setRoleAdmin(Constants.getBorrowerRole(), Constants.getAdminRole());
         _setRoleAdmin(Constants.getPoolLockerRole(), Constants.getAdminRole());
-        _setupRole(Constants.getPoolLockerRole(), owner);
+        _grantRole(Constants.getPoolLockerRole(), owner);
 
         address borrower = opportunityManager.getBorrower(_opportunityID);
-        _setupRole(Constants.getBorrowerRole(), borrower);
+        _grantRole(Constants.getBorrowerRole(), borrower);
         s_opportunityID = _opportunityID;
         s_loanAmount = _loanAmount;
         s_totalOutstandingPrincipal = _loanAmount;
@@ -179,9 +179,9 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
 
     modifier onlyBorrower() {
         require(
-            hasRole(Constants.getBorrowerRole(), msg.sender),
-            "Caller is not borrower"
-        );
+            hasRole(Constants.getBorrowerRole(), msg.sender));
+
+        
         _;
     }
 
