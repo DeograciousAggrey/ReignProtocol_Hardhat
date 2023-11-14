@@ -26,7 +26,7 @@ module.exports = {
     apiKey: process.env.POLYGONSCAN_API_KEY
   },
   path: {
-    artifacts: "../frontend/src/artifacts",
+    artifacts: "../frontend/src/artifacts"
   },
   solidity: {
      compilers: [
