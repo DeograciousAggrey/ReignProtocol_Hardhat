@@ -34,6 +34,7 @@ contract opportunityPool is BaseUpgradeablePausable, IOpportunityPool {
     //////////////////////////////////////////
 
     ReignConfig public reignConfig;
+  
 
     using ConfigHelper for ReignConfig;
     using SafeMathUpgradeable for uint256;
