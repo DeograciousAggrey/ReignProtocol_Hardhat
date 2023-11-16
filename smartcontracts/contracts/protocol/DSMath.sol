@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 /**
  * @title DSMath
@@ -59,8 +59,14 @@ library DSMath {
         }
     }
 
-    function getInRay(uint256 x, uint256 currentDecimals) internal pure returns (uint256 z) {
-        require(currentDecimals >= 0 && currentDecimals <= 27, "ds-math-decimals-out-of-range");
+    function getInRay(
+        uint256 x,
+        uint256 currentDecimals
+    ) internal pure returns (uint256 z) {
+        require(
+            currentDecimals >= 0 && currentDecimals <= 27,
+            "ds-math-decimals-out-of-range"
+        );
         uint256 decimalsToAdd = sub(27, currentDecimals);
         z = mul(x, (10 ** decimalsToAdd));
     }

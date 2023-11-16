@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {BaseUpgradeablePausable} from "./BaseUpgradeablePausable.sol";
 import {ISeniorPool} from "../interfaces/ISeniorPool.sol";
@@ -74,13 +74,21 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
     /////////////////////////////////////////////////////////////////////////
 
     function initialize(ReignConfig _reignConfig) public initializer {
-        require(address(_reignConfig) != address(0), "SeniorPool: reignConfig cannot be zero address");
+        require(
+            address(_reignConfig) != address(0),
+            "SeniorPool: reignConfig cannot be zero address"
+        );
 
         reignConfig = _reignConfig;
         address owner = reignConfig.reignAdminAddress();
-        require(owner != address(0), "SeniorPool: reignAdminAddress cannot be zero address");
+        require(
+            owner != address(0),
+            "SeniorPool: reignAdminAddress cannot be zero address"
+        );
 
-        opportunityManager = IOpportunityManager(reignConfig.getOpportunityOrigination());
+        opportunityManager = IOpportunityManager(
+            reignConfig.getOpportunityOrigination()
+        );
 
         _BaseUpgradeablePausable_init(owner);
         s_usdcToken = IERC20(reignConfig.usdcAddress());
@@ -97,8 +105,13 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
      */
 
     function stake(uint256 amount) external {
-        require(amount > 0 && s_usdcToken.balanceOf(msg.sender) >= amount, "SeniorPool: insufficient USDC balance");
-        s_stakingAmount[msg.sender].push(InvestmentTimestamp(block.timestamp, amount));
+        require(
+            amount > 0 && s_usdcToken.balanceOf(msg.sender) >= amount,
+            "SeniorPool: insufficient USDC balance"
+        );
+        s_stakingAmount[msg.sender].push(
+            InvestmentTimestamp(block.timestamp, amount)
+        );
         s_isStaking[msg.sender] = true;
         s_seniorPoolBalance = s_seniorPoolBalance.add(amount);
         s_usdcToken.transferFrom(msg.sender, address(this), amount);
@@ -114,34 +127,55 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
      *
      */
     function withdrawTo(uint256 amount, address _receiver) public onlyAdmin {
-        require(amount > 0 && s_usdcToken.balanceOf(address(this)) >= amount, "SeniorPool: insufficient USDC balance");
+        require(
+            amount > 0 && s_usdcToken.balanceOf(address(this)) >= amount,
+            "SeniorPool: insufficient USDC balance"
+        );
         s_usdcToken.transfer(_receiver, amount);
         s_seniorPoolBalance = s_seniorPoolBalance.sub(amount);
     }
 
     function invest(bytes32 opportunityId) public onlyAdmin {
-        require(opportunityManager.isActive(opportunityId), "SeniorPool: opportunity is not active");
+        require(
+            opportunityManager.isActive(opportunityId),
+            "SeniorPool: opportunity is not active"
+        );
 
         //Check whether opportunity is already funded by senior pool
-        address poolAddress = opportunityManager.getOpportunityPoolAddress(opportunityId);
+        address poolAddress = opportunityManager.getOpportunityPoolAddress(
+            opportunityId
+        );
         IOpportunityPool opportunitypool = IOpportunityPool(poolAddress);
         uint256 amount = opportunitypool.getSeniorTotalDepositable();
 
         //Check whether senior pool has enough balance to fund the opportunity
-        require(s_seniorPoolBalance >= amount, "SeniorPool: insufficient senior pool balance");
+        require(
+            s_seniorPoolBalance >= amount,
+            "SeniorPool: insufficient senior pool balance"
+        );
         s_seniorPoolBalance = s_seniorPoolBalance.sub(amount);
         //Transfer USDC from senior pool to opportunity pool
         opportunitypool.deposit(1, amount);
     }
 
-    function withdrawFromOpportunity(bool _isWriteOff, bytes32 opportunityId, uint256 amount) public override {
+    function withdrawFromOpportunity(
+        bool _isWriteOff,
+        bytes32 opportunityId,
+        uint256 amount
+    ) public override {
         require(
-            opportunityManager.isRepaid(opportunityId) == true || _isWriteOff == true,
+            opportunityManager.isRepaid(opportunityId) == true ||
+                _isWriteOff == true,
             "SeniorPool: opportunity is not repaid"
         );
-        address poolAddress = opportunityManager.getOpportunityPoolAddress(opportunityId);
+        address poolAddress = opportunityManager.getOpportunityPoolAddress(
+            opportunityId
+        );
         IOpportunityPool opportunitypool = IOpportunityPool(poolAddress);
-        require(msg.sender == poolAddress, "SeniorPool: caller is not opportunity pool");
+        require(
+            msg.sender == poolAddress,
+            "SeniorPool: caller is not opportunity pool"
+        );
 
         //Calculate share price
         uint256 totalprofit;
@@ -152,7 +186,8 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         s_sharePrice = s_sharePrice.add(delta);
 
         if (_isWriteOff == false) {
-            uint256 withdrawableAmount = opportunitypool.getUserWithdrawableAmount();
+            uint256 withdrawableAmount = opportunitypool
+                .getUserWithdrawableAmount();
             s_seniorPoolBalance = s_seniorPoolBalance.add(withdrawableAmount);
         } else {
             s_seniorPoolBalance = s_seniorPoolBalance.add(amount);
@@ -163,8 +198,15 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         s_usdcToken.approve(user, type(uint256).max);
     }
 
-    function getUserInvestment() external view returns (uint256 withdrawableAmount, uint256 stakingAmount) {
-        require(s_isStaking[msg.sender] == true, "SeniorPool: user is not staking");
+    function getUserInvestment()
+        external
+        view
+        returns (uint256 withdrawableAmount, uint256 stakingAmount)
+    {
+        require(
+            s_isStaking[msg.sender] == true,
+            "SeniorPool: user is not staking"
+        );
 
         uint256 stakingAmt;
         uint256 withdrawableAmt;
@@ -180,7 +222,9 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         }
 
         if (s_availableToWithdraw[msg.sender] > 0) {
-            withdrawableAmt = withdrawableAmt.add(s_availableToWithdraw[msg.sender]);
+            withdrawableAmt = withdrawableAmt.add(
+                s_availableToWithdraw[msg.sender]
+            );
         }
 
         return (withdrawableAmt, stakingAmt);
@@ -191,7 +235,10 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
     }
 
     function getTotalStakingBalance() internal view returns (uint256) {
-        require(s_isStaking[msg.sender] == true, "SeniorPool: user is not staking");
+        require(
+            s_isStaking[msg.sender] == true,
+            "SeniorPool: user is not staking"
+        );
 
         uint256 stakingAmt;
         InvestmentTimestamp[] memory investments = s_stakingAmount[msg.sender];
@@ -201,12 +248,14 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         return stakingAmt;
     }
 
-    function sanitizeInputDecimalDiscrepancies(uint256 inputAmt, uint256 withdrawableAmt)
-        internal
-        pure
-        returns (uint256 amount)
-    {
-        if (inputAmt > withdrawableAmt && (inputAmt - withdrawableAmt) < lpMantissa()) {
+    function sanitizeInputDecimalDiscrepancies(
+        uint256 inputAmt,
+        uint256 withdrawableAmt
+    ) internal pure returns (uint256 amount) {
+        if (
+            inputAmt > withdrawableAmt &&
+            (inputAmt - withdrawableAmt) < lpMantissa()
+        ) {
             amount = withdrawableAmt;
         } else {
             amount = inputAmt;
@@ -214,7 +263,10 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
     }
 
     function withdrawWithLP(uint256 amount) external {
-        require(s_isStaking[msg.sender] == true && amount > 0, "SeniorPool: invalid amount or user is not staking");
+        require(
+            s_isStaking[msg.sender] == true && amount > 0,
+            "SeniorPool: invalid amount or user is not staking"
+        );
 
         //Calculate Amount available for investment
         uint256 stakingAmount;
@@ -223,7 +275,9 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
 
         for (uint256 i; i < investments.length; i++) {
             if (investments[i].timestamp.add(lockInTime) <= block.timestamp) {
-                s_availableToWithdraw[msg.sender] = s_availableToWithdraw[msg.sender].add(investments[i].amount);
+                s_availableToWithdraw[msg.sender] = s_availableToWithdraw[
+                    msg.sender
+                ].add(investments[i].amount);
                 delete investments[i];
             } else {
                 stakingAmount = stakingAmount.add(investments[i].amount);
@@ -233,10 +287,17 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         //Sanitize if there is decimal discrepancy with input amount and available amount
         uint256 withdrawableAmt = s_availableToWithdraw[msg.sender];
         amount = sanitizeInputDecimalDiscrepancies(amount, withdrawableAmt);
-        require(amount <= withdrawableAmt, "SeniorPool: insufficient withdrawable amount");
-        s_availableToWithdraw[msg.sender] = s_availableToWithdraw[msg.sender].sub(amount);
+        require(
+            amount <= withdrawableAmt,
+            "SeniorPool: insufficient withdrawable amount"
+        );
+        s_availableToWithdraw[msg.sender] = s_availableToWithdraw[msg.sender]
+            .sub(amount);
 
-        if (getTotalStakingBalance() == 0 && s_availableToWithdraw[msg.sender] == 0) {
+        if (
+            getTotalStakingBalance() == 0 &&
+            s_availableToWithdraw[msg.sender] == 0
+        ) {
             s_isStaking[msg.sender] = false;
         }
 
@@ -250,11 +311,18 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         uint256 totalSharesAfterWithdrawal = totalShares().sub(amount);
 
         //For small misc values when totalSharesAfterWithdrawal is 0 set share price to 0
-        if (s_seniorPoolBalance < lpMantissa() || totalSharesAfterWithdrawal == 0) {
+        if (
+            s_seniorPoolBalance < lpMantissa() ||
+            totalSharesAfterWithdrawal == 0
+        ) {
             s_sharePrice = 0;
         } else {
-            uint256 availableProfit = s_seniorPoolBalance.sub(totalSharesAfterWithdrawal);
-            s_sharePrice = availableProfit.mul(lpMantissa()).div(totalSharesAfterWithdrawal);
+            uint256 availableProfit = s_seniorPoolBalance.sub(
+                totalSharesAfterWithdrawal
+            );
+            s_sharePrice = availableProfit.mul(lpMantissa()).div(
+                totalSharesAfterWithdrawal
+            );
         }
         //Burn the lp equivalent of the amount
         s_reignToken.burn(msg.sender, amount);
@@ -267,7 +335,10 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
     }
 
     function totalShares() internal view returns (uint256) {
-        require(address(s_reignToken) != address(0), "SeniorPool: reignToken address cannot be zero address");
+        require(
+            address(s_reignToken) != address(0),
+            "SeniorPool: reignToken address cannot be zero address"
+        );
         return s_reignToken.totalShares();
     }
 
@@ -275,7 +346,9 @@ contract SeniorPool is BaseUpgradeablePausable, ISeniorPool {
         return uint256(10) ** uint256(6);
     }
 
-    function getUSDCAmountFromShares(uint256 amount) internal view returns (uint256) {
+    function getUSDCAmountFromShares(
+        uint256 amount
+    ) internal view returns (uint256) {
         return amount.add(amount.mul(s_sharePrice).div(lpMantissa()));
     }
 }

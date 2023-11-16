@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 library Constants {
     uint256 public constant ONE_YEAR_IN_DAYS = 365;
@@ -12,7 +12,8 @@ library Constants {
     bytes32 public constant SENIOR_POOL_ROLE = keccak256("SENIOR_POOL_ROLE");
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
     bytes32 public constant POOL_LOCKER_ROLE = keccak256("POOL_LOCKER_ROLE");
-    bytes32 public constant AUTHORIZE_USER_ROLE = keccak256("AUTHORIZE_USER_ROLE");
+    bytes32 public constant AUTHORIZE_USER_ROLE =
+        keccak256("AUTHORIZE_USER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");

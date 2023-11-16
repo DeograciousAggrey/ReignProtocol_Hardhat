@@ -1,11 +1,16 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {ReignTreasury} from "./ReignTreasury.sol";
 
 contract multiSigWallet {
     event Deposit(address indexed sender, uint256 amount, uint256 balance);
-    event SubmitTransaction(address indexed owner, uint256 indexed txIndex, address indexed to, uint256 value);
+    event SubmitTransaction(
+        address indexed owner,
+        uint256 indexed txIndex,
+        address indexed to,
+        uint256 value
+    );
 
     event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
     event RevokeConfirmation(address indexed owner, uint256 indexed txIndex);
@@ -48,10 +53,15 @@ contract multiSigWallet {
         _;
     }
 
-    constructor(address[] memory _owners, uint256 _numConfirmationsRequired, address _reignTreasuryWallet) {
+    constructor(
+        address[] memory _owners,
+        uint256 _numConfirmationsRequired,
+        address _reignTreasuryWallet
+    ) {
         require(_owners.length > 0, "owners required");
         require(
-            _numConfirmationsRequired > 0 && _numConfirmationsRequired <= _owners.length,
+            _numConfirmationsRequired > 0 &&
+                _numConfirmationsRequired <= _owners.length,
             "invalid number of required confirmations"
         );
 
@@ -72,12 +82,21 @@ contract multiSigWallet {
     function submitTransaction(address _to, uint256 _value) public onlyOwner {
         uint256 txIndex = transactions.length;
 
-        transactions.push(Transaction({to: _to, value: _value, executed: false, numConfirmations: 0}));
+        transactions.push(
+            Transaction({
+                to: _to,
+                value: _value,
+                executed: false,
+                numConfirmations: 0
+            })
+        );
 
         emit SubmitTransaction(tx.origin, txIndex, _to, _value);
     }
 
-    function confirmTransaction(uint256 _txIndex)
+    function confirmTransaction(
+        uint256 _txIndex
+    )
         public
         onlyOwner
         txExists(_txIndex)
@@ -94,12 +113,20 @@ contract multiSigWallet {
         }
     }
 
-    function executeTransaction(uint256 _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function executeTransaction(
+        uint256 _txIndex
+    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
-        require(transaction.numConfirmations >= numConfirmationsRequired, "cannot execute tx");
+        require(
+            transaction.numConfirmations >= numConfirmationsRequired,
+            "cannot execute tx"
+        );
 
         transaction.executed = true;
-        ReignTreasury(reignTreasuryWallet).withdraw(transaction.to, transaction.value);
+        ReignTreasury(reignTreasuryWallet).withdraw(
+            transaction.to,
+            transaction.value
+        );
 
         emit ExecuteTransaction(tx.origin, _txIndex);
     }
@@ -108,7 +135,9 @@ contract multiSigWallet {
         reignTreasuryWallet = _reignTreasuryWallet;
     }
 
-    function revokeConfirmation(uint256 _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function revokeConfirmation(
+        uint256 _txIndex
+    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
         require(isConfirmed[_txIndex][tx.origin], "tx not confirmed");
 
@@ -126,13 +155,25 @@ contract multiSigWallet {
         return transactions.length;
     }
 
-    function getTransaction(uint256 _txIndex)
+    function getTransaction(
+        uint256 _txIndex
+    )
         public
         view
-        returns (address to, uint256 value, bool executed, uint256 numConfirmations)
+        returns (
+            address to,
+            uint256 value,
+            bool executed,
+            uint256 numConfirmations
+        )
     {
         Transaction storage transaction = transactions[_txIndex];
 
-        return (transaction.to, transaction.value, transaction.executed, transaction.numConfirmations);
+        return (
+            transaction.to,
+            transaction.value,
+            transaction.executed,
+            transaction.numConfirmations
+        );
     }
 }

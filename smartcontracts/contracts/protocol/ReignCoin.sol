@@ -21,7 +21,7 @@
 // private
 // view & pure functions
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -29,7 +29,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../interfaces/IReignCoin.sol";
 import "./Constants.sol";
 
-contract ReignCoin is Initializable, AccessControlUpgradeable, ERC20Upgradeable, IReignCoin {
+contract ReignCoin is
+    Initializable,
+    AccessControlUpgradeable,
+    ERC20Upgradeable,
+    IReignCoin
+{
     /////////////////////
     //Errors         ///
     ///////////////////
@@ -51,13 +56,19 @@ contract ReignCoin is Initializable, AccessControlUpgradeable, ERC20Upgradeable,
     }
 
     function mint(address _to, uint256 _amount) public override {
-        require(hasRole(Constants.getOwnerRole(), msg.sender), "Caller is not an owner");
+        require(
+            hasRole(Constants.getOwnerRole(), msg.sender),
+            "Caller is not an owner"
+        );
         totalShares += _amount;
         _mint(_to, _amount);
     }
 
     function burn(address _from, uint256 _amount) public override {
-        require(hasRole(Constants.getOwnerRole(), msg.sender), "Caller is not an owner");
+        require(
+            hasRole(Constants.getOwnerRole(), msg.sender),
+            "Caller is not an owner"
+        );
         totalShares -= _amount;
         _burn(_from, _amount);
     }

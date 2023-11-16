@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 /**
  * @title IReignKeeper
@@ -8,5 +8,6 @@ pragma solidity ^0.8.20;
  */
 interface IReignKeeper {
     function addOpportunityInKeeper(bytes32 _opportunityId) external;
+
     function removeOpportunityFromKeeper(bytes32 _opportunityId) external;
 }

@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {ReignConfig} from "../protocol/ReignConfig.sol";
+
 /**
  * @title Opportunity Pool Interface
  * @author
@@ -10,5 +11,9 @@ import {ReignConfig} from "../protocol/ReignConfig.sol";
  */
 
 interface ISeniorPool {
-    function withdrawFromOpportunity(bool _isWriteOff, bytes32 _opportunityId, uint256 _amount) external;
+    function withdrawFromOpportunity(
+        bool _isWriteOff,
+        bytes32 _opportunityId,
+        uint256 _amount
+    ) external;
 }

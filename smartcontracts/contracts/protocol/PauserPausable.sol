@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -8,7 +8,10 @@ import {Constants} from "./Constants.sol";
 
 contract PauserPausable is AccessControlUpgradeable, PausableUpgradeable {
     modifier onlyPauserRole() {
-        require(hasRole(Constants.getPauserRole(), _msgSender()), "PauserPausable: Caller is not a pauser");
+        require(
+            hasRole(Constants.getPauserRole(), _msgSender()),
+            "PauserPausable: Caller is not a pauser"
+        );
         _;
     }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -26,9 +26,13 @@ contract BaseUpgradeablePausable is
 {
     using SafeMathUpgradeable for uint256;
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyAdmin {}
 
-    function _BaseUpgradeablePausable_init(address owner) public onlyInitializing {
+    function _BaseUpgradeablePausable_init(
+        address owner
+    ) public onlyInitializing {
         require(owner != address(0), "Owner cannot be the zero address");
         __AccessControl_init_unchained();
         __Pausable_init_unchained();

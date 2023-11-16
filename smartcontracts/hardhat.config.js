@@ -11,7 +11,7 @@ task("accounts", "Prints the list of accounts", async () => {
 } );
 
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: "polygon_mumbain",
   networks: {
     hardhat: {
       gasPrice: 470000000000,
@@ -43,7 +43,7 @@ module.exports = {
         version: "0.7.0"
       },
       {
-        version: "0.8.0"
+        version: "0.8.4"
       },{
         version: "0.8.9"
       },

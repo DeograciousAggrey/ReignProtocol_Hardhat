@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {ERC721URIStorageUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {ERC721URIStorageUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ERC721BurnableUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
+import {ERC721BurnableUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CountersUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
@@ -52,7 +50,10 @@ contract IdentityToken is
         _unpause();
     }
 
-    function safeMint(address to, string memory uri) public onlyRole(Constants.getMinterRole()) {
+    function safeMint(
+        address to,
+        string memory uri
+    ) public onlyRole(Constants.getMinterRole()) {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
@@ -63,15 +64,21 @@ contract IdentityToken is
     //     require(from == address(0) || to == address(0), "Not allowed to transfer token");
     // }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Constants.getUpgraderRole()) {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(Constants.getUpgraderRole()) {}
 
     // The following functions are overrides required by Solidity.
 
-    function _burn(uint256 tokenId) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
+    function _burn(
+        uint256 tokenId
+    ) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
         super._burn(tokenId);
     }
 
-    function tokenURI(uint256 tokenId)
+    function tokenURI(
+        uint256 tokenId
+    )
         public
         view
         override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
@@ -80,10 +87,16 @@ contract IdentityToken is
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId)
+    function supportsInterface(
+        bytes4 interfaceId
+    )
         public
         view
-        override(ERC721Upgradeable, AccessControlUpgradeable, ERC721URIStorageUpgradeable)
+        override(
+            ERC721Upgradeable,
+            AccessControlUpgradeable,
+            ERC721URIStorageUpgradeable
+        )
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

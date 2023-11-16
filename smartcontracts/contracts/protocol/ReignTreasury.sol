@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {BaseUpgradeablePausable} from "./BaseUpgradeablePausable.sol";
 import {ConfigHelper} from "./ConfigHelper.sol";
@@ -34,7 +34,10 @@ contract ReignTreasury is BaseUpgradeablePausable {
         return balance;
     }
 
-    function withdraw(address to, uint256 amount) public nonReentrant whenNotPaused onlyAdmin {
+    function withdraw(
+        address to,
+        uint256 amount
+    ) public nonReentrant whenNotPaused onlyAdmin {
         require(amount > 0, "Amount Should be greater than zero");
         require(msg.sender == wallet, "Only wallet can withdraw");
         uint256 totalBalance = getTreasuryBalance();

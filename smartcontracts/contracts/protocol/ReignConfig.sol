@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import {BaseUpgradeablePausable} from "./BaseUpgradeablePausable.sol";
 import {ConfigHelper} from "./ConfigHelper.sol";
@@ -18,7 +18,10 @@ contract ReignConfig is BaseUpgradeablePausable {
         setAddress(0, msg.sender);
     }
 
-    function setAddress(uint256 indexAddress, address newAddress) public onlyAdmin nonReentrant {
+    function setAddress(
+        uint256 indexAddress,
+        address newAddress
+    ) public onlyAdmin nonReentrant {
         require(address(newAddress) != address(0), "Invalid Address");
         addresses[indexAddress] = newAddress;
     }
@@ -27,7 +30,10 @@ contract ReignConfig is BaseUpgradeablePausable {
         return addresses[indexAddress];
     }
 
-    function setNumber(uint256 id, uint256 newNumber) public onlyAdmin nonReentrant {
+    function setNumber(
+        uint256 id,
+        uint256 newNumber
+    ) public onlyAdmin nonReentrant {
         numbers[id] = newNumber;
     }
 
@@ -35,7 +41,10 @@ contract ReignConfig is BaseUpgradeablePausable {
         return numbers[id];
     }
 
-    function setFlag(bytes32 indexFlag, bool isFlag) public onlyAdmin nonReentrant {
+    function setFlag(
+        bytes32 indexFlag,
+        bool isFlag
+    ) public onlyAdmin nonReentrant {
         flag[indexFlag] = isFlag;
     }
 

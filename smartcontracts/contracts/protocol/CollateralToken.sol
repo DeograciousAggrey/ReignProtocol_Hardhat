@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
@@ -30,7 +30,10 @@ contract CollateralToken is
 
     CountersUpgradeable.Counter private _tokenIdCounter;
 
-    function initialize(ReignConfig config, address _minterRole) public initializer {
+    function initialize(
+        ReignConfig config,
+        address _minterRole
+    ) public initializer {
         require(address(config) != address(0), "Invalid config address");
 
         reignConfig = ReignConfig(config);
@@ -62,26 +65,40 @@ contract CollateralToken is
         _unpause();
     }
 
-    function safeMint(address to, string memory uri) public onlyRole(Constants.getMinterRole()) {
+    function safeMint(
+        address to,
+        string memory uri
+    ) public onlyRole(Constants.getMinterRole()) {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256) internal override whenNotPaused {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256
+    ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId, 1);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Constants.getUpgraderRole()) {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(Constants.getUpgraderRole()) {}
 
     // The following functions are overrides required by Solidity.
 
-    function _burn(uint256 tokenId) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
+    function _burn(
+        uint256 tokenId
+    ) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
         super._burn(tokenId);
     }
 
-    function tokenURI(uint256 tokenId)
+    function tokenURI(
+        uint256 tokenId
+    )
         public
         view
         override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
@@ -90,10 +107,16 @@ contract CollateralToken is
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId)
+    function supportsInterface(
+        bytes4 interfaceId
+    )
         public
         view
-        override(AccessControlUpgradeable, ERC721URIStorageUpgradeable, ERC721Upgradeable)
+        override(
+            AccessControlUpgradeable,
+            ERC721URIStorageUpgradeable,
+            ERC721Upgradeable
+        )
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
